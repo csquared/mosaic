@@ -333,47 +333,38 @@
         const WHITE_THRESHOLD = 10; // LAB Delta-E threshold for considering a color as white
         const TILE_SIZE = 20; // Size of each tile in pixels
         
-        // Tile colors and names
-        const tileColors = [
-            [232, 232, 228], // Off White
-            [201, 201, 196], // Light Gray
-            [170, 170, 164], // Medium Gray
-            [140, 140, 134], // Warm Gray
-            [110, 110, 104], // Dark Gray
-            [80, 80, 74],    // Charcoal
-            [60, 60, 54],    // Deep Charcoal
-            [255, 255, 255], // Pure White
-            [0, 0, 0],       // Black
-            [194, 180, 153], // Beige
-            [160, 140, 110], // Taupe
-            [120, 100, 70],  // Brown
-            [70, 50, 30],    // Dark Brown
-            [200, 220, 210], // Pale Green
-            [120, 180, 160], // Sage
-            [60, 120, 100],  // Deep Green
-            [180, 210, 230], // Light Blue
-            [100, 150, 200], // Blue
-            [40, 80, 140],   // Navy
-            [230, 200, 180], // Peach
-            [200, 140, 120], // Terracotta
-            [180, 60, 40],   // Red
-            [255, 220, 0],   // Yellow
-            [255, 150, 0]    // Orange
-        ];
-
-        const colorNames = [
-            "Off White", "Light Gray", "Medium Gray", "Warm Gray",
-            "Dark Gray", "Charcoal", "Deep Charcoal", "Pure White",
-            "Black", "Beige", "Taupe", "Brown",
-            "Dark Brown", "Pale Green", "Sage", "Deep Green",
-            "Light Blue", "Blue", "Navy", "Peach",
-            "Terracotta", "Red", "Yellow", "Orange"
+        // Tile palette definition
+        const tilePalette = [
+            { slug: "off-white", name: "Off White", rgb: [232, 232, 228] },
+            { slug: "light-gray", name: "Light Gray", rgb: [201, 201, 196] },
+            { slug: "medium-gray", name: "Medium Gray", rgb: [170, 170, 164] },
+            { slug: "warm-gray", name: "Warm Gray", rgb: [140, 140, 134] },
+            { slug: "dark-gray", name: "Dark Gray", rgb: [110, 110, 104] },
+            { slug: "charcoal", name: "Charcoal", rgb: [80, 80, 74] },
+            { slug: "deep-charcoal", name: "Deep Charcoal", rgb: [60, 60, 54] },
+            { slug: "pure-white", name: "Pure White", rgb: [255, 255, 255] },
+            { slug: "black", name: "Black", rgb: [0, 0, 0] },
+            { slug: "beige", name: "Beige", rgb: [194, 180, 153] },
+            { slug: "taupe", name: "Taupe", rgb: [160, 140, 110] },
+            { slug: "brown", name: "Brown", rgb: [120, 100, 70] },
+            { slug: "dark-brown", name: "Dark Brown", rgb: [70, 50, 30] },
+            { slug: "pale-green", name: "Pale Green", rgb: [200, 220, 210] },
+            { slug: "sage", name: "Sage", rgb: [120, 180, 160] },
+            { slug: "deep-green", name: "Deep Green", rgb: [60, 120, 100] },
+            { slug: "light-blue", name: "Light Blue", rgb: [180, 210, 230] },
+            { slug: "blue", name: "Blue", rgb: [100, 150, 200] },
+            { slug: "navy", name: "Navy", rgb: [40, 80, 140] },
+            { slug: "peach", name: "Peach", rgb: [230, 200, 180] },
+            { slug: "terracotta", name: "Terracotta", rgb: [200, 140, 120] },
+            { slug: "red", name: "Red", rgb: [180, 60, 40] },
+            { slug: "yellow", name: "Yellow", rgb: [255, 220, 0] },
+            { slug: "orange", name: "Orange", rgb: [255, 150, 0] }
         ];
         
         // State variables
-        let selectedColorIndex = 0;
+        let selectedColorSlug = tilePalette[0].slug;
         let imageData = null;
-        let colorCounts = new Array(tileColors.length).fill(0);
+        let colorCounts = Object.fromEntries(tilePalette.map(color => [color.slug, 0]));
         let originalColors = new Map();
         let undoStack = [];
         let currentGridState = new Map();
@@ -433,17 +424,16 @@
             // Check if it's close enough to white
             const whiteLab = rgbToLab(255, 255, 255);
             if (labColorDistance(targetLab, whiteLab) < WHITE_THRESHOLD) {
-                return tileColors.findIndex(color => 
-                    color[0] === 255 && color[1] === 255 && color[2] === 255
+                return tilePalette.findIndex(color => 
+                    color.rgb[0] === 255 && color.rgb[1] === 255 && color.rgb[2] === 255
                 );
             }
             
             let minDistance = Infinity;
             let closestIndex = 0;
             
-            tileColors.forEach((tileRgb, index) => {
-                const tileLab = rgbToLab(...tileRgb);
-                const distance = labColorDistance(targetLab, tileLab);
+            tilePalette.forEach((color, index) => {
+                const distance = labColorDistance(targetLab, rgbToLab(...color.rgb));
                 if (distance < minDistance) {
                     minDistance = distance;
                     closestIndex = index;
@@ -487,8 +477,8 @@
                 // Parse RGB values from the background-color
                 const rgb = bgcolor.match(/\d+/g).map(Number);
                 const colorIndex = findClosestTileColor(rgb);
-                const color = tileColors[colorIndex];
-                const colorName = colorNames[colorIndex];
+                const color = tilePalette[colorIndex];
+                const colorName = color.name;
 
                 // Update current color display
                 const currentColorDiv = document.getElementById('currentColor');
@@ -496,9 +486,9 @@
                 const currentColorRGBSpan = document.getElementById('currentColorRGB');
                 const currentColorIndexSpan = document.getElementById('currentColorIndex');
 
-                currentColorDiv.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                currentColorDiv.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
                 currentColorNameSpan.textContent = colorName;
-                currentColorRGBSpan.textContent = `${color[0]}, ${color[1]}, ${color[2]}`;
+                currentColorRGBSpan.textContent = `${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]}`;
                 currentColorIndexSpan.textContent = colorIndex;
             }
         }
@@ -572,20 +562,20 @@
             
             palette.innerHTML = '';
             
-            tileColors.forEach((color, index) => {
+            tilePalette.forEach((color, index) => {
                 const swatch = document.createElement('div');
                 swatch.className = 'color-swatch' + (index === selectedColorIndex ? ' selected' : '');
-                swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                swatch.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
                 swatch.onclick = () => selectColor(index);
                 palette.appendChild(swatch);
-                console.log(`Created swatch for color ${colorNames[index]}`); // Debug log
+                console.log(`Created swatch for color ${color.name}`); // Debug log
             });
         }
         
         // Select a color from the palette
         function selectColor(index) {
-            console.log(`Selecting color: ${colorNames[index]}`); // Debug log
-            selectedColorIndex = index;
+            console.log(`Selecting color: ${tilePalette[index].name}`); // Debug log
+            selectedColorSlug = tilePalette[index].slug;
             
             // Update visual selection
             document.querySelectorAll('.color-swatch').forEach((swatch, i) => {
@@ -593,17 +583,17 @@
             });
             
             // Update selected color display and name
-            const color = tileColors[index];
-            const colorName = colorNames[index];
+            const color = tilePalette[index];
+            const colorName = color.name;
             const selectedColorDiv = document.getElementById('selectedColor');
             const selectedColorNameSpan = document.getElementById('selectedColorName');
             const selectedColorRGBSpan = document.getElementById('selectedColorRGB');
             const selectedColorIndexSpan = document.getElementById('selectedColorIndex');
             
             if (selectedColorDiv && selectedColorNameSpan && selectedColorRGBSpan && selectedColorIndexSpan) {
-                selectedColorDiv.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                selectedColorDiv.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
                 selectedColorNameSpan.textContent = colorName;
-                selectedColorRGBSpan.textContent = `${color[0]}, ${color[1]}, ${color[2]}`;
+                selectedColorRGBSpan.textContent = `${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]}`;
                 selectedColorIndexSpan.textContent = index;
             } else {
                 console.error('Selected color display elements not found!');
@@ -628,7 +618,11 @@
         });
         
         function updateColorCounts() {
-            colorCounts.fill(0);
+            // Reset all color counts
+            tilePalette.forEach(color => {
+                colorCounts[color.slug] = 0;
+            });
+
             const cells = document.querySelectorAll('#mosaicContainer .mosaic-cell');
             let totalCount = 0;
             
@@ -638,7 +632,7 @@
                     // Parse RGB values from the background-color
                     const rgb = bgcolor.match(/\d+/g).map(Number);
                     const colorIndex = findClosestTileColor(rgb);
-                    colorCounts[colorIndex]++;
+                    colorCounts[tilePalette[colorIndex].slug]++;
                     totalCount++;
                 }
             });
@@ -647,19 +641,18 @@
             const countGrid = document.getElementById('colorCountGrid');
             countGrid.innerHTML = '';
             
-            colorCounts.forEach((count, index) => {
-                if (count > 0) {
+            tilePalette.forEach(color => {
+                if (colorCounts[color.slug] > 0) {
                     const countItem = document.createElement('div');
                     countItem.className = 'color-count-item';
                     
                     const swatch = document.createElement('div');
                     swatch.className = 'color-count-swatch';
-                    const color = tileColors[index];
-                    swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                    swatch.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
                     
                     const info = document.createElement('div');
                     info.className = 'color-count-info';
-                    info.textContent = `${colorNames[index]}: ${count}`;
+                    info.textContent = `${color.name}: ${colorCounts[color.slug]}`;
                     
                     countItem.appendChild(swatch);
                     countItem.appendChild(info);
@@ -708,11 +701,13 @@
         
         // Selection handling
         function createSelectionOverlay() {
+            removeSelectionOverlay(); // Remove any existing overlay
             selectionOverlay = document.createElement('div');
-            selectionOverlay.style.position = 'absolute';
+            selectionOverlay.style.position = 'fixed'; // Changed from absolute to fixed
             selectionOverlay.style.border = '2px solid #ff6b6b';
             selectionOverlay.style.backgroundColor = 'rgba(255, 107, 107, 0.2)';
             selectionOverlay.style.pointerEvents = 'none';
+            selectionOverlay.style.zIndex = '1000';
             document.body.appendChild(selectionOverlay);
         }
         
@@ -772,8 +767,8 @@
                 const [row, col] = position.split('-').map(Number);
                 const cell = document.querySelector(`[data-position="${position}"]`);
                 if (cell && previousColorIndex !== undefined) {
-                    const color = tileColors[previousColorIndex];
-                    cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                    const color = tilePalette[previousColorIndex];
+                    cell.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
                     currentGridState.set(position, previousColorIndex);
                 }
             });
@@ -784,8 +779,12 @@
         
         // Save/Load functionality
         function saveProgress() {
+            // Convert current state to use slugs instead of indices
+            const gridState = Array.from(currentGridState.entries()).map(([pos, index]) => [pos, tilePalette[index].slug]);
+            
             const saveData = {
-                gridState: Array.from(currentGridState.entries()),
+                version: 1,  // Adding version for future compatibility
+                gridState: gridState,
                 dimensions: {
                     width: document.querySelector('.mosaic-row').children.length,
                     height: document.querySelector('.mosaic-grid').children.length
@@ -850,15 +849,21 @@
                         // First create an empty grid without auto-population
                         createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
                         
-                        // Then restore the exact saved state
-                        currentGridState = new Map(saveData.gridState);
+                        // Clear current state
+                        currentGridState.clear();
                         
-                        // Apply saved colors using the exact indices that were saved
-                        currentGridState.forEach((colorIndex, position) => {
-                            const cell = document.querySelector(`[data-position="${position}"]`);
-                            if (cell) {
-                                const color = tileColors[colorIndex];
-                                cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                        // Convert saved slugs back to indices and restore the state
+                        saveData.gridState.forEach(([position, colorSlug]) => {
+                            const colorIndex = tilePalette.findIndex(color => color.slug === colorSlug);
+                            if (colorIndex !== -1) {
+                                const cell = document.querySelector(`[data-position="${position}"]`);
+                                if (cell) {
+                                    const color = tilePalette[colorIndex];
+                                    cell.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
+                                    currentGridState.set(position, colorIndex);
+                                }
+                            } else {
+                                console.warn(`Color slug "${colorSlug}" not found in palette`);
                             }
                         });
                         
@@ -879,10 +884,11 @@
         function paintCell(cell) {
             const position = cell.dataset.position;
             const previousColorIndex = currentGridState.get(position);
-            const color = tileColors[selectedColorIndex];
+            const colorIndex = tilePalette.findIndex(color => color.slug === selectedColorSlug);
+            const color = tilePalette[colorIndex];
             
-            cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-            currentGridState.set(position, selectedColorIndex);
+            cell.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
+            currentGridState.set(position, colorIndex);
             
             return { position, previousColorIndex };
         }
@@ -910,6 +916,14 @@
             const grid = document.createElement('div');
             grid.className = 'mosaic-grid';
             
+            // Add container-level event handlers
+            grid.addEventListener('mouseleave', () => {
+                if (isSelecting) {
+                    isSelecting = false;
+                    removeSelectionOverlay();
+                }
+            });
+            
             for (let row = 0; row < gridHeight; row++) {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'mosaic-row';
@@ -921,7 +935,12 @@
                     cell.dataset.position = pos;
                     
                     // Add hover events for eyedropper
-                    cell.addEventListener('mouseenter', () => updateCurrentColor(cell));
+                    cell.addEventListener('mouseenter', () => {
+                        updateCurrentColor(cell);
+                        if (isSelecting) {
+                            updateSelectionOverlay(selectionStart, cell);
+                        }
+                    });
                     cell.addEventListener('mouseleave', resetCurrentColor);
                     
                     // Mouse event handlers for selection
@@ -934,12 +953,7 @@
                         e.preventDefault(); // Prevent text selection
                     });
                     
-                    cell.addEventListener('mousemove', (e) => {
-                        if (!isSelecting) return;
-                        updateSelectionOverlay(selectionStart, cell);
-                    });
-                    
-                    cell.addEventListener('mouseup', () => {
+                    cell.addEventListener('mouseup', (e) => {
                         if (!isSelecting) return;
                         const selectedCells = getCellsInSelection(selectionStart, cell);
                         const changes = selectedCells.map(selectedCell => paintCell(selectedCell));
@@ -947,6 +961,7 @@
                         isSelecting = false;
                         removeSelectionOverlay();
                         updateColorCounts();
+                        e.stopPropagation(); // Prevent document handler from firing
                     });
                     
                     // Single-click handling
@@ -972,8 +987,8 @@
                         originalColors.set(pos, pixelColor);
                         
                         const closestColorIndex = findClosestTileColor(pixelColor);
-                        const tileColor = tileColors[closestColorIndex];
-                        cell.style.backgroundColor = `rgb(${tileColor[0]}, ${tileColor[1]}, ${tileColor[2]})`;
+                        const tileColor = tilePalette[closestColorIndex];
+                        cell.style.backgroundColor = `rgb(${tileColor.rgb[0]}, ${tileColor.rgb[1]}, ${tileColor.rgb[2]})`;
                         currentGridState.set(pos, closestColorIndex);
                     }
                     
@@ -989,23 +1004,28 @@
         
         // Add global mouse event handlers
         document.addEventListener('mouseup', () => {
-            isSelecting = false;
-            removeSelectionOverlay();
+            if (isSelecting) {
+                isSelecting = false;
+                removeSelectionOverlay();
+            }
         });
         
-        document.addEventListener('mouseleave', () => {
-            isSelecting = false;
-            removeSelectionOverlay();
+        document.addEventListener('mousemove', (e) => {
+            if (!isSelecting) return;
+            
+            // Find the cell under the cursor
+            const cell = document.elementFromPoint(e.clientX, e.clientY);
+            if (cell && cell.classList.contains('mosaic-cell') && !cell.classList.contains('reference')) {
+                updateSelectionOverlay(selectionStart, cell);
+            }
         });
         
         // Initialize the page
         document.addEventListener('DOMContentLoaded', () => {
             console.log('DOM loaded, initializing...'); // Debug log
             createGrid();
+            initColorPalette();
         });
-
-        // Initialize color palette immediately
-        initColorPalette();
     </script>
 </body>
 </html> 
