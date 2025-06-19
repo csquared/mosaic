@@ -43,6 +43,11 @@
             gap: 20px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            justify-content: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .grids-container {
@@ -67,7 +72,6 @@
             background: white;
             padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .control-group label {
@@ -129,6 +133,7 @@
             grid-template-columns: repeat(8, 1fr);
             gap: 4px;
             margin-top: 10px;
+            min-width: 272px; /* 8 columns * (30px + 4px gap) */
         }
         
         .color-swatch {
@@ -188,6 +193,7 @@
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
+            margin: 0 5px;
         }
         
         .button:hover {
@@ -197,6 +203,14 @@
         .button:disabled {
             background: #cccccc;
             cursor: not-allowed;
+        }
+        
+        .button.secondary {
+            background: #2196F3;
+        }
+        
+        .button.secondary:hover {
+            background: #1976D2;
         }
 
         .toggle-view {
@@ -246,15 +260,6 @@
         </div>
         
         <div class="controls">
-            <div class="control-group">
-                <label for="gridSize">Base Grid Size:</label>
-                <input type="number" id="gridSize" value="42" min="5" max="100">
-                <div style="margin-top: 5px; font-size: 12px; color: #666;">
-                    Grid will maintain image aspect ratio
-                </div>
-                <button class="button" onclick="createGrid()">Create Grid</button>
-            </div>
-            
             <div class="toggle-view">
                 <button id="toggleView" class="toggle-button" onclick="toggleView()">
                     Show Original Image
@@ -274,6 +279,12 @@
                 <div class="selected-color-info">
                     <span id="selectedColorName">Off White</span>
                 </div>
+            </div>
+
+            <div class="control-group">
+                <button id="undoButton" class="button secondary" onclick="undo()" disabled>Undo</button>
+                <button class="button" onclick="saveProgress()">Save Progress</button>
+                <button class="button secondary" onclick="loadProgress()">Load Progress</button>
             </div>
         </div>
         
@@ -306,7 +317,7 @@
         const WHITE_THRESHOLD = 10; // LAB Delta-E threshold for considering a color as white
         const TILE_SIZE = 20; // Size of each tile in pixels
         
-        // Tile colors from palette.py
+        // Tile colors and names
         const tileColors = [
             [232, 232, 228], // Off White
             [201, 201, 196], // Light Gray
@@ -333,7 +344,7 @@
             [255, 220, 0],   // Yellow
             [255, 150, 0]    // Orange
         ];
-        
+
         const colorNames = [
             "Off White", "Light Gray", "Medium Gray", "Warm Gray",
             "Dark Gray", "Charcoal", "Deep Charcoal", "Pure White",
@@ -343,11 +354,13 @@
             "Terracotta", "Red", "Yellow", "Orange"
         ];
         
+        // State variables
         let selectedColorIndex = 0;
         let imageData = null;
         let colorCounts = new Array(tileColors.length).fill(0);
-        let showingOriginal = false;
-        let originalColors = new Map(); // Store original colors for each cell
+        let originalColors = new Map();
+        let undoStack = [];
+        let currentGridState = new Map();
         
         // Selection variables
         let isSelecting = false;
@@ -493,21 +506,28 @@
         
         // Initialize color palette
         function initColorPalette() {
+            console.log('Initializing color palette...'); // Debug log
             const palette = document.getElementById('colorPalette');
+            if (!palette) {
+                console.error('Color palette element not found!');
+                return;
+            }
+            
             palette.innerHTML = '';
             
             tileColors.forEach((color, index) => {
                 const swatch = document.createElement('div');
-                swatch.className = 'color-swatch';
+                swatch.className = 'color-swatch' + (index === selectedColorIndex ? ' selected' : '');
                 swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
                 swatch.onclick = () => selectColor(index);
                 palette.appendChild(swatch);
+                console.log(`Created swatch for color ${colorNames[index]}`); // Debug log
             });
-            
-            selectColor(0);
         }
         
+        // Select a color from the palette
         function selectColor(index) {
+            console.log(`Selecting color: ${colorNames[index]}`); // Debug log
             selectedColorIndex = index;
             
             // Update visual selection
@@ -518,9 +538,15 @@
             // Update selected color display and name
             const color = tileColors[index];
             const colorName = colorNames[index];
-            document.getElementById('selectedColor').style.backgroundColor = 
-                `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-            document.getElementById('selectedColorName').textContent = colorName;
+            const selectedColorDiv = document.getElementById('selectedColor');
+            const selectedColorNameSpan = document.getElementById('selectedColorName');
+            
+            if (selectedColorDiv && selectedColorNameSpan) {
+                selectedColorDiv.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                selectedColorNameSpan.textContent = colorName;
+            } else {
+                console.error('Selected color display elements not found!');
+            }
         }
         
         // Handle image upload
@@ -657,10 +683,110 @@
             });
         }
         
-        // Create mosaic grid
+        // Modified selection handling to support undo
+        function pushUndoState(changes) {
+            undoStack.push(changes);
+            document.getElementById('undoButton').disabled = false;
+        }
+        
+        function undo() {
+            if (undoStack.length === 0) return;
+            
+            const lastChange = undoStack.pop();
+            lastChange.forEach(({position, previousColorIndex}) => {
+                const [row, col] = position.split('-').map(Number);
+                const cell = document.querySelector(`[data-position="${position}"]`);
+                if (cell && previousColorIndex !== undefined) {
+                    const color = tileColors[previousColorIndex];
+                    cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                    currentGridState.set(position, previousColorIndex);
+                }
+            });
+            
+            updateColorCounts();
+            document.getElementById('undoButton').disabled = undoStack.length === 0;
+        }
+        
+        // Save/Load functionality
+        function saveProgress() {
+            const saveData = {
+                gridState: Array.from(currentGridState.entries()),
+                dimensions: {
+                    width: document.querySelector('.mosaic-row').children.length,
+                    height: document.querySelector('.mosaic-grid').children.length
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(saveData)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'mosaic_progress.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function loadProgress() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = event => {
+                    try {
+                        const saveData = JSON.parse(event.target.result);
+                        currentGridState = new Map(saveData.gridState);
+                        
+                        // Recreate the grid with saved dimensions
+                        createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
+                        
+                        // Apply saved colors
+                        currentGridState.forEach((colorIndex, position) => {
+                            const cell = document.querySelector(`[data-position="${position}"]`);
+                            if (cell) {
+                                const color = tileColors[colorIndex];
+                                cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                            }
+                        });
+                        
+                        updateColorCounts();
+                    } catch (error) {
+                        console.error('Error loading save file:', error);
+                        alert('Error loading save file. Please make sure it\'s a valid mosaic save file.');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        // Modified paintCell to support undo
+        function paintCell(cell) {
+            const position = cell.dataset.position;
+            const previousColorIndex = currentGridState.get(position);
+            const color = tileColors[selectedColorIndex];
+            
+            cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+            currentGridState.set(position, selectedColorIndex);
+            
+            return { position, previousColorIndex };
+        }
+        
+        // Modified createGrid to initialize currentGridState
         function createGrid(autoPopulate = false, width = null, height = null) {
             const gridWidth = width || 42;
             const gridHeight = height || 67;
+            
+            currentGridState.clear();
+            undoStack.length = 0;
+            document.getElementById('undoButton').disabled = true;
             
             const container = document.getElementById('mosaicContainer');
             container.innerHTML = '';
@@ -681,7 +807,7 @@
                     
                     // Mouse event handlers for selection
                     cell.addEventListener('mousedown', (e) => {
-                        if (!e.button === 0) return; // Left click only
+                        if (e.button !== 0) return; // Left click only
                         isSelecting = true;
                         selectionStart = cell;
                         createSelectionOverlay();
@@ -697,12 +823,20 @@
                     cell.addEventListener('mouseup', () => {
                         if (!isSelecting) return;
                         const selectedCells = getCellsInSelection(selectionStart, cell);
-                        selectedCells.forEach(selectedCell => {
-                            paintCell(selectedCell);
-                        });
+                        const changes = selectedCells.map(selectedCell => paintCell(selectedCell));
+                        pushUndoState(changes);
                         isSelecting = false;
                         removeSelectionOverlay();
                         updateColorCounts();
+                    });
+                    
+                    // Single-click handling
+                    cell.addEventListener('click', (e) => {
+                        if (!isSelecting && e.button === 0) {
+                            const change = [paintCell(cell)];
+                            pushUndoState(change);
+                            updateColorCounts();
+                        }
                     });
                     
                     if (autoPopulate && imageData) {
@@ -721,6 +855,7 @@
                         const closestColorIndex = findClosestTileColor(pixelColor);
                         const tileColor = tileColors[closestColorIndex];
                         cell.style.backgroundColor = `rgb(${tileColor[0]}, ${tileColor[1]}, ${tileColor[2]})`;
+                        currentGridState.set(pos, closestColorIndex);
                     }
                     
                     rowDiv.appendChild(cell);
@@ -731,11 +866,6 @@
             
             container.appendChild(grid);
             updateColorCounts();
-        }
-        
-        function paintCell(cell) {
-            const color = tileColors[selectedColorIndex];
-            cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
         }
         
         // Add global mouse event handlers
@@ -750,8 +880,13 @@
         });
         
         // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing...'); // Debug log
+            createGrid();
+        });
+
+        // Initialize color palette immediately
         initColorPalette();
-        createGrid();
     </script>
 </body>
 </html> 
