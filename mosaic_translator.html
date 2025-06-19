@@ -629,7 +629,8 @@
         
         function updateColorCounts() {
             colorCounts.fill(0);
-            const cells = document.querySelectorAll('.mosaic-cell');
+            const cells = document.querySelectorAll('#mosaicContainer .mosaic-cell');
+            let totalCount = 0;
             
             cells.forEach(cell => {
                 const bgcolor = cell.style.backgroundColor;
@@ -638,6 +639,7 @@
                     const rgb = bgcolor.match(/\d+/g).map(Number);
                     const colorIndex = findClosestTileColor(rgb);
                     colorCounts[colorIndex]++;
+                    totalCount++;
                 }
             });
             
@@ -664,6 +666,18 @@
                     countGrid.appendChild(countItem);
                 }
             });
+
+            // Add total count at the bottom
+            const totalCountItem = document.createElement('div');
+            totalCountItem.className = 'color-count-item';
+            totalCountItem.style.gridColumn = '1 / -1';  // Span all columns
+            totalCountItem.style.justifyContent = 'center';
+            totalCountItem.style.fontWeight = 'bold';
+            totalCountItem.style.marginTop = '10px';
+            totalCountItem.style.borderTop = '2px solid #ccc';
+            totalCountItem.style.paddingTop = '10px';
+            totalCountItem.textContent = `Total Tiles: ${totalCount}`;
+            countGrid.appendChild(totalCountItem);
         }
         
         function toggleView() {
