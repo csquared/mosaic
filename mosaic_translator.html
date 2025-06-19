@@ -65,6 +65,47 @@
             border-radius: 4px;
         }
         
+        .selected-color-info {
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .color-count {
+            margin-top: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .color-count-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .color-count-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px;
+            border-radius: 4px;
+            background: #f8f8f8;
+        }
+        
+        .color-count-swatch {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #333;
+            border-radius: 3px;
+        }
+        
+        .color-count-info {
+            flex-grow: 1;
+            font-size: 14px;
+        }
+        
         .palette {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
@@ -131,6 +172,38 @@
             background: #cccccc;
             cursor: not-allowed;
         }
+
+        .toggle-view {
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .toggle-button {
+            background: #4a90e2;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .toggle-button:hover {
+            background: #357abd;
+        }
+
+        .toggle-button.showing-original {
+            background: #e24a4a;
+        }
+
+        .toggle-button.showing-original:hover {
+            background: #bd3535;
+        }
+
+        .mosaic-cell.showing-original {
+            transition: background-color 0.3s;
+        }
     </style>
 </head>
 <body>
@@ -148,9 +221,18 @@
         
         <div class="controls">
             <div class="control-group">
-                <label for="gridSize">Grid Size:</label>
-                <input type="number" id="gridSize" value="20" min="5" max="100">
+                <label for="gridSize">Base Grid Size:</label>
+                <input type="number" id="gridSize" value="42" min="5" max="100">
+                <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                    Grid will maintain image aspect ratio
+                </div>
                 <button class="button" onclick="createGrid()">Create Grid</button>
+            </div>
+            
+            <div class="toggle-view">
+                <button id="toggleView" class="toggle-button" onclick="toggleView()">
+                    Show Original Image
+                </button>
             </div>
             
             <div class="control-group">
@@ -163,11 +245,21 @@
             <div class="control-group">
                 <label>Selected Color:</label>
                 <div id="selectedColor" style="width: 50px; height: 30px; border: 2px solid #333; border-radius: 4px; background: #fff;"></div>
+                <div class="selected-color-info">
+                    <span id="selectedColorName">Off White</span>
+                </div>
             </div>
         </div>
         
         <div id="mosaicContainer" style="text-align: center;">
             <!-- Mosaic grid will be generated here -->
+        </div>
+        
+        <div class="color-count">
+            <h3>Tile Count by Color</h3>
+            <div id="colorCountGrid" class="color-count-grid">
+                <!-- Color counts will be generated here -->
+            </div>
         </div>
     </div>
 
@@ -200,8 +292,20 @@
             [255, 150, 0]    // Orange
         ];
         
+        const colorNames = [
+            "Off White", "Light Gray", "Medium Gray", "Warm Gray",
+            "Dark Gray", "Charcoal", "Deep Charcoal", "Pure White",
+            "Black", "Beige", "Taupe", "Brown",
+            "Dark Brown", "Pale Green", "Sage", "Deep Green",
+            "Light Blue", "Blue", "Navy", "Peach",
+            "Terracotta", "Red", "Yellow", "Orange"
+        ];
+        
         let selectedColorIndex = 0;
         let imageData = null;
+        let colorCounts = new Array(tileColors.length).fill(0);
+        let showingOriginal = false;
+        let originalColors = new Map(); // Store original colors for each cell
         
         // Calculate color distance (Euclidean distance in RGB space)
         function colorDistance(color1, color2) {
@@ -244,11 +348,16 @@
             // Get image data
             imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            // Update grid size input to match image dimensions
-            document.getElementById('gridSize').value = Math.min(canvas.width, canvas.height);
+            // Calculate grid dimensions maintaining aspect ratio
+            const baseSize = parseInt(document.getElementById('gridSize').value);
+            const aspectRatio = canvas.width / canvas.height;
+            const gridWidth = Math.round(baseSize * aspectRatio);
+            
+            // Update grid size input to show dimensions
+            document.getElementById('gridSize').title = `Grid size: ${gridWidth} × ${baseSize}`;
             
             // Create and populate grid
-            createGrid(true);
+            createGrid(true, gridWidth, baseSize);
         }
         
         // Initialize color palette
@@ -275,10 +384,12 @@
                 swatch.classList.toggle('selected', i === index);
             });
             
-            // Update selected color display
+            // Update selected color display and name
             const color = tileColors[index];
+            const colorName = colorNames[index];
             document.getElementById('selectedColor').style.backgroundColor = 
                 `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+            document.getElementById('selectedColorName').textContent = colorName;
         }
         
         // Handle image upload
@@ -298,29 +409,105 @@
             }
         });
         
-        // Create mosaic grid
-        function createGrid(autoPopulate = false) {
-            const size = parseInt(document.getElementById('gridSize').value);
-            const container = document.getElementById('mosaicContainer');
+        function updateColorCounts() {
+            colorCounts.fill(0);
+            const cells = document.querySelectorAll('.mosaic-cell');
             
+            cells.forEach(cell => {
+                const bgcolor = cell.style.backgroundColor;
+                if (bgcolor) {
+                    // Parse RGB values from the background-color
+                    const rgb = bgcolor.match(/\d+/g).map(Number);
+                    const colorIndex = findClosestTileColor(rgb);
+                    colorCounts[colorIndex]++;
+                }
+            });
+            
+            // Update the color count display
+            const countGrid = document.getElementById('colorCountGrid');
+            countGrid.innerHTML = '';
+            
+            colorCounts.forEach((count, index) => {
+                if (count > 0) {
+                    const countItem = document.createElement('div');
+                    countItem.className = 'color-count-item';
+                    
+                    const swatch = document.createElement('div');
+                    swatch.className = 'color-count-swatch';
+                    const color = tileColors[index];
+                    swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                    
+                    const info = document.createElement('div');
+                    info.className = 'color-count-info';
+                    info.textContent = `${colorNames[index]}: ${count}`;
+                    
+                    countItem.appendChild(swatch);
+                    countItem.appendChild(info);
+                    countGrid.appendChild(countItem);
+                }
+            });
+        }
+        
+        function toggleView() {
+            showingOriginal = !showingOriginal;
+            const button = document.getElementById('toggleView');
+            const cells = document.querySelectorAll('.mosaic-cell');
+            
+            button.textContent = showingOriginal ? 'Show Tile Colors' : 'Show Original Image';
+            button.classList.toggle('showing-original', showingOriginal);
+            
+            cells.forEach(cell => {
+                const pos = cell.dataset.position;
+                if (pos && originalColors.has(pos)) {
+                    if (showingOriginal) {
+                        // Store current tile color
+                        cell.dataset.tileColor = cell.style.backgroundColor;
+                        // Show original color with slight transparency
+                        const origColor = originalColors.get(pos);
+                        cell.style.backgroundColor = `rgba(${origColor[0]}, ${origColor[1]}, ${origColor[2]}, 0.85)`;
+                    } else {
+                        // Restore tile color
+                        cell.style.backgroundColor = cell.dataset.tileColor;
+                    }
+                }
+                cell.classList.toggle('showing-original', showingOriginal);
+            });
+        }
+        
+        // Create mosaic grid
+        function createGrid(autoPopulate = false, width = null, height = null) {
+            const baseSize = parseInt(document.getElementById('gridSize').value);
+            let gridWidth = width || baseSize;
+            let gridHeight = height || baseSize;
+            
+            const container = document.getElementById('mosaicContainer');
             container.innerHTML = '';
+            originalColors.clear();
             
             const grid = document.createElement('div');
             grid.className = 'mosaic-grid';
             
-            for (let row = 0; row < size; row++) {
+            for (let row = 0; row < gridHeight; row++) {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'mosaic-row';
                 
-                for (let col = 0; col < size; col++) {
+                for (let col = 0; col < gridWidth; col++) {
                     const cell = document.createElement('div');
                     cell.className = 'mosaic-cell';
-                    cell.onclick = () => paintCell(cell);
+                    const pos = `${row}-${col}`;
+                    cell.dataset.position = pos;
+                    
+                    cell.onclick = () => {
+                        if (!showingOriginal) {
+                            paintCell(cell);
+                            updateColorCounts();
+                        }
+                    };
                     
                     if (autoPopulate && imageData) {
                         // Calculate the corresponding pixel position in the original image
-                        const imgX = Math.floor((col / size) * imageData.width);
-                        const imgY = Math.floor((row / size) * imageData.height);
+                        const imgX = Math.floor((col / gridWidth) * imageData.width);
+                        const imgY = Math.floor((row / gridHeight) * imageData.height);
                         const pixelIndex = (imgY * imageData.width + imgX) * 4;
                         
                         // Get pixel color
@@ -329,6 +516,9 @@
                             imageData.data[pixelIndex + 1],
                             imageData.data[pixelIndex + 2]
                         ];
+                        
+                        // Store original color
+                        originalColors.set(pos, pixelColor);
                         
                         // Find and apply closest tile color
                         const closestColorIndex = findClosestTileColor(pixelColor);
@@ -343,6 +533,11 @@
             }
             
             container.appendChild(grid);
+            updateColorCounts();
+            
+            // Reset view to tile colors when creating new grid
+            showingOriginal = true; // Set to true so toggle will switch to false
+            toggleView();
         }
         
         function paintCell(cell) {
