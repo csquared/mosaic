@@ -279,6 +279,22 @@
                 <div class="selected-color-info">
                     <span id="selectedColorName">Off White</span>
                 </div>
+                <div class="current-color-info" style="margin-top: 10px; font-size: 12px; color: #666;">
+                    <div>RGB: <span id="selectedColorRGB">232, 232, 228</span></div>
+                    <div>Index: <span id="selectedColorIndex">0</span></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Current Color:</label>
+                <div id="currentColor" style="width: 50px; height: 30px; border: 2px solid #333; border-radius: 4px; background: #fff;"></div>
+                <div class="current-color-info">
+                    <span id="currentColorName">-</span>
+                </div>
+                <div class="current-color-info" style="margin-top: 10px; font-size: 12px; color: #666;">
+                    <div>RGB: <span id="currentColorRGB">-</span></div>
+                    <div>Index: <span id="currentColorIndex">-</span></div>
+                </div>
             </div>
 
             <div class="control-group">
@@ -463,6 +479,42 @@
             createGrid(true, gridWidth, gridHeight);
         }
         
+        // Update current color display when hovering over cells
+        function updateCurrentColor(cell) {
+            const bgcolor = cell.style.backgroundColor;
+            if (bgcolor) {
+                // Parse RGB values from the background-color
+                const rgb = bgcolor.match(/\d+/g).map(Number);
+                const colorIndex = findClosestTileColor(rgb);
+                const color = tileColors[colorIndex];
+                const colorName = colorNames[colorIndex];
+
+                // Update current color display
+                const currentColorDiv = document.getElementById('currentColor');
+                const currentColorNameSpan = document.getElementById('currentColorName');
+                const currentColorRGBSpan = document.getElementById('currentColorRGB');
+                const currentColorIndexSpan = document.getElementById('currentColorIndex');
+
+                currentColorDiv.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                currentColorNameSpan.textContent = colorName;
+                currentColorRGBSpan.textContent = `${color[0]}, ${color[1]}, ${color[2]}`;
+                currentColorIndexSpan.textContent = colorIndex;
+            }
+        }
+
+        // Reset current color display when not hovering
+        function resetCurrentColor() {
+            const currentColorDiv = document.getElementById('currentColor');
+            const currentColorNameSpan = document.getElementById('currentColorName');
+            const currentColorRGBSpan = document.getElementById('currentColorRGB');
+            const currentColorIndexSpan = document.getElementById('currentColorIndex');
+
+            currentColorDiv.style.backgroundColor = '#fff';
+            currentColorNameSpan.textContent = '-';
+            currentColorRGBSpan.textContent = '-';
+            currentColorIndexSpan.textContent = '-';
+        }
+
         // Create reference grid showing original image
         function createReferenceGrid(width, height) {
             const container = document.getElementById('referenceContainer');
@@ -493,6 +545,10 @@
                         ];
                         
                         cell.style.backgroundColor = `rgb(${pixelColor[0]}, ${pixelColor[1]}, ${pixelColor[2]})`;
+                        
+                        // Add hover events for eyedropper
+                        cell.addEventListener('mouseenter', () => updateCurrentColor(cell));
+                        cell.addEventListener('mouseleave', resetCurrentColor);
                     }
                     
                     rowDiv.appendChild(cell);
@@ -540,10 +596,14 @@
             const colorName = colorNames[index];
             const selectedColorDiv = document.getElementById('selectedColor');
             const selectedColorNameSpan = document.getElementById('selectedColorName');
+            const selectedColorRGBSpan = document.getElementById('selectedColorRGB');
+            const selectedColorIndexSpan = document.getElementById('selectedColorIndex');
             
-            if (selectedColorDiv && selectedColorNameSpan) {
+            if (selectedColorDiv && selectedColorNameSpan && selectedColorRGBSpan && selectedColorIndexSpan) {
                 selectedColorDiv.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
                 selectedColorNameSpan.textContent = colorName;
+                selectedColorRGBSpan.textContent = `${color[0]}, ${color[1]}, ${color[2]}`;
+                selectedColorIndexSpan.textContent = index;
             } else {
                 console.error('Selected color display elements not found!');
             }
@@ -718,14 +778,45 @@
             };
             
             const blob = new Blob([JSON.stringify(saveData)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
+            a.href = URL.createObjectURL(blob);
             a.download = 'mosaic_progress.json';
+            a.style.display = 'none';
             document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            
+            // Trigger the save dialog
+            if (window.showSaveFilePicker) {
+                // Use modern file system API if available
+                const opts = {
+                    suggestedName: 'mosaic_progress.json',
+                    types: [{
+                        description: 'JSON File',
+                        accept: {'application/json': ['.json']}
+                    }]
+                };
+                
+                window.showSaveFilePicker(opts)
+                    .then(handle => handle.createWritable())
+                    .then(writable => {
+                        writable.write(blob)
+                            .then(() => writable.close())
+                            .then(() => console.log('File saved successfully'));
+                    })
+                    .catch(err => {
+                        // Fall back to simple download if user cancels or browser doesn't support the API
+                        console.log('Falling back to simple download');
+                        a.click();
+                    });
+            } else {
+                // Fall back to simple download for browsers that don't support the file system API
+                a.click();
+            }
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            }, 0);
         }
         
         function loadProgress() {
@@ -742,8 +833,8 @@
                         const saveData = JSON.parse(event.target.result);
                         currentGridState = new Map(saveData.gridState);
                         
-                        // Recreate the grid with saved dimensions
-                        createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
+                        // Recreate the grid with saved dimensions but keep it interactive
+                        createGrid(true, saveData.dimensions.width, saveData.dimensions.height);
                         
                         // Apply saved colors
                         currentGridState.forEach((colorIndex, position) => {
@@ -804,6 +895,10 @@
                     cell.className = 'mosaic-cell';
                     const pos = `${row}-${col}`;
                     cell.dataset.position = pos;
+                    
+                    // Add hover events for eyedropper
+                    cell.addEventListener('mouseenter', () => updateCurrentColor(cell));
+                    cell.addEventListener('mouseleave', resetCurrentColor);
                     
                     // Mouse event handlers for selection
                     cell.addEventListener('mousedown', (e) => {
