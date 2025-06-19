@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mosaic Translator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .image-upload {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .image-preview {
+            max-width: 100%;
+            max-height: 400px;
+            margin: 20px 0;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .control-group input, .control-group select {
+            width: 100px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .palette {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            margin-top: 10px;
+        }
+        
+        .color-swatch {
+            width: 30px;
+            height: 30px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        
+        .color-swatch:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-swatch.selected {
+            border-color: #ff6b6b;
+            border-width: 3px;
+        }
+        
+        .mosaic-grid {
+            display: inline-block;
+            border: 2px solid #333;
+            background: white;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .mosaic-row {
+            display: flex;
+        }
+        
+        .mosaic-cell {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .mosaic-cell:hover {
+            border-color: #ff6b6b;
+        }
+        
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .button:hover {
+            background: #45a049;
+        }
+        
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Mosaic Translator</h1>
+            <p>Load an image and translate it into tile choices</p>
+        </div>
+        
+        <div class="image-upload">
+            <input type="file" id="imageInput" accept="image/*">
+            <br><br>
+            <img id="imagePreview" class="image-preview" style="display: none;">
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="gridSize">Grid Size:</label>
+                <input type="number" id="gridSize" value="20" min="5" max="100">
+                <button class="button" onclick="createGrid()">Create Grid</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Color Palette:</label>
+                <div class="palette" id="colorPalette">
+                    <!-- Color swatches will be generated here -->
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Selected Color:</label>
+                <div id="selectedColor" style="width: 50px; height: 30px; border: 2px solid #333; border-radius: 4px; background: #fff;"></div>
+            </div>
+        </div>
+        
+        <div id="mosaicContainer" style="text-align: center;">
+            <!-- Mosaic grid will be generated here -->
+        </div>
+    </div>
+
+    <script>
+        // Tile colors from palette.py
+        const tileColors = [
+            [232, 232, 228], // Off White
+            [201, 201, 196], // Light Gray
+            [170, 170, 164], // Medium Gray
+            [140, 140, 134], // Warm Gray
+            [110, 110, 104], // Dark Gray
+            [80, 80, 74],    // Charcoal
+            [60, 60, 54],    // Deep Charcoal
+            [255, 255, 255], // Pure White
+            [0, 0, 0],       // Black
+            [194, 180, 153], // Beige
+            [160, 140, 110], // Taupe
+            [120, 100, 70],  // Brown
+            [70, 50, 30],    // Dark Brown
+            [200, 220, 210], // Pale Green
+            [120, 180, 160], // Sage
+            [60, 120, 100],  // Deep Green
+            [180, 210, 230], // Light Blue
+            [100, 150, 200], // Blue
+            [40, 80, 140],   // Navy
+            [230, 200, 180], // Peach
+            [200, 140, 120], // Terracotta
+            [180, 60, 40],   // Red
+            [255, 220, 0],   // Yellow
+            [255, 150, 0]    // Orange
+        ];
+        
+        let selectedColorIndex = 0;
+        let imageData = null;
+        
+        // Calculate color distance (Euclidean distance in RGB space)
+        function colorDistance(color1, color2) {
+            return Math.sqrt(
+                Math.pow(color1[0] - color2[0], 2) +
+                Math.pow(color1[1] - color2[1], 2) +
+                Math.pow(color1[2] - color2[2], 2)
+            );
+        }
+        
+        // Find the closest tile color for a given RGB color
+        function findClosestTileColor(targetColor) {
+            let minDistance = Infinity;
+            let closestIndex = 0;
+            
+            tileColors.forEach((tileColor, index) => {
+                const distance = colorDistance(targetColor, tileColor);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestIndex = index;
+                }
+            });
+            
+            return closestIndex;
+        }
+        
+        // Process image and create mosaic grid
+        function processImage(img) {
+            // Create canvas to read image data
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size to match image
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            
+            // Draw image to canvas
+            ctx.drawImage(img, 0, 0);
+            
+            // Get image data
+            imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Update grid size input to match image dimensions
+            document.getElementById('gridSize').value = Math.min(canvas.width, canvas.height);
+            
+            // Create and populate grid
+            createGrid(true);
+        }
+        
+        // Initialize color palette
+        function initColorPalette() {
+            const palette = document.getElementById('colorPalette');
+            palette.innerHTML = '';
+            
+            tileColors.forEach((color, index) => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                swatch.onclick = () => selectColor(index);
+                palette.appendChild(swatch);
+            });
+            
+            selectColor(0);
+        }
+        
+        function selectColor(index) {
+            selectedColorIndex = index;
+            
+            // Update visual selection
+            document.querySelectorAll('.color-swatch').forEach((swatch, i) => {
+                swatch.classList.toggle('selected', i === index);
+            });
+            
+            // Update selected color display
+            const color = tileColors[index];
+            document.getElementById('selectedColor').style.backgroundColor = 
+                `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+        }
+        
+        // Handle image upload
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('imagePreview');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    
+                    // Wait for image to load before processing
+                    preview.onload = () => processImage(preview);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        // Create mosaic grid
+        function createGrid(autoPopulate = false) {
+            const size = parseInt(document.getElementById('gridSize').value);
+            const container = document.getElementById('mosaicContainer');
+            
+            container.innerHTML = '';
+            
+            const grid = document.createElement('div');
+            grid.className = 'mosaic-grid';
+            
+            for (let row = 0; row < size; row++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'mosaic-row';
+                
+                for (let col = 0; col < size; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'mosaic-cell';
+                    cell.onclick = () => paintCell(cell);
+                    
+                    if (autoPopulate && imageData) {
+                        // Calculate the corresponding pixel position in the original image
+                        const imgX = Math.floor((col / size) * imageData.width);
+                        const imgY = Math.floor((row / size) * imageData.height);
+                        const pixelIndex = (imgY * imageData.width + imgX) * 4;
+                        
+                        // Get pixel color
+                        const pixelColor = [
+                            imageData.data[pixelIndex],
+                            imageData.data[pixelIndex + 1],
+                            imageData.data[pixelIndex + 2]
+                        ];
+                        
+                        // Find and apply closest tile color
+                        const closestColorIndex = findClosestTileColor(pixelColor);
+                        const tileColor = tileColors[closestColorIndex];
+                        cell.style.backgroundColor = `rgb(${tileColor[0]}, ${tileColor[1]}, ${tileColor[2]})`;
+                    }
+                    
+                    rowDiv.appendChild(cell);
+                }
+                
+                grid.appendChild(rowDiv);
+            }
+            
+            container.appendChild(grid);
+        }
+        
+        function paintCell(cell) {
+            const color = tileColors[selectedColorIndex];
+            cell.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+        }
+        
+        // Initialize the page
+        initColorPalette();
+        createGrid();
+    </script>
+</body>
+</html> 
