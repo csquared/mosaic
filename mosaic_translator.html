@@ -377,6 +377,7 @@
         let originalColors = new Map();
         let undoStack = [];
         let currentGridState = new Map();
+        let showingOriginal = false;
         
         // Selection variables
         let isSelecting = false;
@@ -668,7 +669,7 @@
         function toggleView() {
             showingOriginal = !showingOriginal;
             const button = document.getElementById('toggleView');
-            const cells = document.querySelectorAll('.mosaic-cell');
+            const cells = document.querySelectorAll('#mosaicContainer .mosaic-cell');
             
             button.textContent = showingOriginal ? 'Show Tile Colors' : 'Show Original Image';
             button.classList.toggle('showing-original', showingOriginal);
@@ -684,7 +685,7 @@
                         cell.style.backgroundColor = `rgba(${origColor[0]}, ${origColor[1]}, ${origColor[2]}, 0.85)`;
                     } else {
                         // Restore tile color
-                        cell.style.backgroundColor = cell.dataset.tileColor;
+                        cell.style.backgroundColor = cell.dataset.tileColor || cell.style.backgroundColor;
                     }
                 }
                 cell.classList.toggle('showing-original', showingOriginal);
@@ -831,12 +832,14 @@
                 reader.onload = event => {
                     try {
                         const saveData = JSON.parse(event.target.result);
+                        
+                        // First create an empty grid without auto-population
+                        createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
+                        
+                        // Then restore the exact saved state
                         currentGridState = new Map(saveData.gridState);
                         
-                        // Recreate the grid with saved dimensions but keep it interactive
-                        createGrid(true, saveData.dimensions.width, saveData.dimensions.height);
-                        
-                        // Apply saved colors
+                        // Apply saved colors using the exact indices that were saved
                         currentGridState.forEach((colorIndex, position) => {
                             const cell = document.querySelector(`[data-position="${position}"]`);
                             if (cell) {
@@ -870,18 +873,25 @@
             return { position, previousColorIndex };
         }
         
-        // Modified createGrid to initialize currentGridState
+        // Modified createGrid to handle loading saved state properly
         function createGrid(autoPopulate = false, width = null, height = null) {
             const gridWidth = width || 42;
             const gridHeight = height || 67;
             
-            currentGridState.clear();
-            undoStack.length = 0;
-            document.getElementById('undoButton').disabled = true;
+            // Only clear the state if we're not loading a saved state
+            if (autoPopulate) {
+                currentGridState.clear();
+                undoStack.length = 0;
+                document.getElementById('undoButton').disabled = true;
+            }
             
             const container = document.getElementById('mosaicContainer');
             container.innerHTML = '';
-            originalColors.clear();
+            
+            // Only clear original colors if we're creating a new grid
+            if (autoPopulate) {
+                originalColors.clear();
+            }
             
             const grid = document.createElement('div');
             grid.className = 'mosaic-grid';
