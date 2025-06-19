@@ -45,6 +45,24 @@
             flex-wrap: wrap;
         }
         
+        .grids-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .grid-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .grid-title {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
         .control-group {
             background: white;
             padding: 15px;
@@ -150,8 +168,16 @@
             transition: background-color 0.2s;
         }
         
+        .mosaic-cell.reference {
+            cursor: default;
+        }
+        
         .mosaic-cell:hover {
             border-color: #ff6b6b;
+        }
+        
+        .mosaic-cell.reference:hover {
+            border-color: #ddd;
         }
         
         .button {
@@ -251,8 +277,20 @@
             </div>
         </div>
         
-        <div id="mosaicContainer" style="text-align: center;">
-            <!-- Mosaic grid will be generated here -->
+        <div class="grids-container">
+            <div class="grid-wrapper">
+                <div class="grid-title">Original Image</div>
+                <div id="referenceContainer">
+                    <!-- Reference grid will be generated here -->
+                </div>
+            </div>
+            
+            <div class="grid-wrapper">
+                <div class="grid-title">Tile Picker</div>
+                <div id="mosaicContainer">
+                    <!-- Mosaic grid will be generated here -->
+                </div>
+            </div>
         </div>
         
         <div class="color-count">
@@ -348,16 +386,56 @@
             // Get image data
             imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            // Calculate grid dimensions maintaining aspect ratio
-            const baseSize = parseInt(document.getElementById('gridSize').value);
+            // Calculate grid dimensions based on aspect ratio
             const aspectRatio = canvas.width / canvas.height;
-            const gridWidth = Math.round(baseSize * aspectRatio);
+            const baseHeight = 67; // Fixed height
+            const gridWidth = Math.round(baseHeight * aspectRatio);
+            const gridHeight = baseHeight;
             
-            // Update grid size input to show dimensions
-            document.getElementById('gridSize').title = `Grid size: ${gridWidth} × ${baseSize}`;
+            // Create both grids
+            createReferenceGrid(gridWidth, gridHeight);
+            createGrid(true, gridWidth, gridHeight);
+        }
+        
+        // Create reference grid showing original image
+        function createReferenceGrid(width, height) {
+            const container = document.getElementById('referenceContainer');
+            container.innerHTML = '';
             
-            // Create and populate grid
-            createGrid(true, gridWidth, baseSize);
+            const grid = document.createElement('div');
+            grid.className = 'mosaic-grid';
+            
+            for (let row = 0; row < height; row++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'mosaic-row';
+                
+                for (let col = 0; col < width; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'mosaic-cell reference';
+                    
+                    if (imageData) {
+                        // Calculate the corresponding pixel position
+                        const imgX = Math.floor((col / width) * imageData.width);
+                        const imgY = Math.floor((row / height) * imageData.height);
+                        const pixelIndex = (imgY * imageData.width + imgX) * 4;
+                        
+                        // Get pixel color
+                        const pixelColor = [
+                            imageData.data[pixelIndex],
+                            imageData.data[pixelIndex + 1],
+                            imageData.data[pixelIndex + 2]
+                        ];
+                        
+                        cell.style.backgroundColor = `rgb(${pixelColor[0]}, ${pixelColor[1]}, ${pixelColor[2]})`;
+                    }
+                    
+                    rowDiv.appendChild(cell);
+                }
+                
+                grid.appendChild(rowDiv);
+            }
+            
+            container.appendChild(grid);
         }
         
         // Initialize color palette
@@ -476,9 +554,8 @@
         
         // Create mosaic grid
         function createGrid(autoPopulate = false, width = null, height = null) {
-            const baseSize = parseInt(document.getElementById('gridSize').value);
-            let gridWidth = width || baseSize;
-            let gridHeight = height || baseSize;
+            const gridWidth = width || 42;
+            const gridHeight = height || 67;
             
             const container = document.getElementById('mosaicContainer');
             container.innerHTML = '';
@@ -505,7 +582,7 @@
                     };
                     
                     if (autoPopulate && imageData) {
-                        // Calculate the corresponding pixel position in the original image
+                        // Calculate the corresponding pixel position
                         const imgX = Math.floor((col / gridWidth) * imageData.width);
                         const imgY = Math.floor((row / gridHeight) * imageData.height);
                         const pixelIndex = (imgY * imageData.width + imgX) * 4;
@@ -534,10 +611,6 @@
             
             container.appendChild(grid);
             updateColorCounts();
-            
-            // Reset view to tile colors when creating new grid
-            showingOriginal = true; // Set to true so toggle will switch to false
-            toggleView();
         }
         
         function paintCell(cell) {
