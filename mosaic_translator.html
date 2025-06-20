@@ -301,6 +301,7 @@
                 <button id="undoButton" class="button secondary" onclick="undo()" disabled>Undo</button>
                 <button class="button" onclick="saveProgress()">Save Progress</button>
                 <button class="button secondary" onclick="loadProgress()">Load Progress</button>
+                <button class="button secondary" onclick="loadOldProgress()" title="Load a file saved in the previous format to convert it.">Load Old Format</button>
             </div>
         </div>
         
@@ -779,16 +780,25 @@
         
         // Save/Load functionality
         function saveProgress() {
-            // Convert current state to use slugs instead of indices
-            const gridState = Array.from(currentGridState.entries()).map(([pos, index]) => [pos, tilePalette[index].slug]);
+            // Get grid dimensions
+            const height = document.querySelector('#mosaicContainer .mosaic-grid').children.length;
+            const width = document.querySelector('#mosaicContainer .mosaic-row').children.length;
             
-            const saveData = {
-                version: 1,  // Adding version for future compatibility
-                gridState: gridState,
-                dimensions: {
-                    width: document.querySelector('.mosaic-row').children.length,
-                    height: document.querySelector('.mosaic-grid').children.length
+            // Create a 2D array initialized with null
+            const gridArray = Array(height).fill().map(() => Array(width).fill(null));
+            
+            // Populate the 2D array with color slugs from the grid state
+            currentGridState.forEach((colorIndex, position) => {
+                const [row, col] = position.split('-').map(Number);
+                if (row < height && col < width) {
+                    gridArray[row][col] = tilePalette[colorIndex].slug;
                 }
+            });
+
+            const saveData = {
+                version: 2,  // Bump version for new format
+                gridState: gridArray,
+                dimensions: { width, height }
             };
             
             const blob = new Blob([JSON.stringify(saveData)], {type: 'application/json'});
@@ -846,13 +856,75 @@
                     try {
                         const saveData = JSON.parse(event.target.result);
                         
+                        if (saveData.version !== 2) {
+                            alert('This file is not in the new V2 format. Please use the "Load Old Format" button to convert it.');
+                            return;
+                        }
+
                         // First create an empty grid without auto-population
                         createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
                         
                         // Clear current state
                         currentGridState.clear();
                         
-                        // Convert saved slugs back to indices and restore the state
+                        // 2D array with slugs
+                        saveData.gridState.forEach((row, rowIndex) => {
+                            row.forEach((colorSlug, colIndex) => {
+                                if (colorSlug) {
+                                    const colorIndex = tilePalette.findIndex(color => color.slug === colorSlug);
+                                    if (colorIndex !== -1) {
+                                        const position = `${rowIndex}-${colIndex}`;
+                                        const cell = document.querySelector(`[data-position="${position}"]`);
+                                        if (cell) {
+                                            const color = tilePalette[colorIndex];
+                                            cell.style.backgroundColor = `rgb(${color.rgb[0]}, ${color.rgb[1]}, ${color.rgb[2]})`;
+                                            currentGridState.set(position, colorIndex);
+                                        }
+                                    } else {
+                                        console.warn(`Color slug "${colorSlug}" not found in palette`);
+                                    }
+                                }
+                            });
+                        });
+                        
+                        updateColorCounts();
+                    } catch (error) {
+                        console.error('Error loading save file:', error);
+                        alert('Error loading save file. Please make sure it\'s a valid mosaic save file.');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function loadOldProgress() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = event => {
+                    try {
+                        const saveData = JSON.parse(event.target.result);
+
+                        if (saveData.version === 2) {
+                            alert('This appears to be a new format file. Please use the standard "Load Progress" button.');
+                            return;
+                        }
+                        
+                        // First create an empty grid without auto-population
+                        createGrid(false, saveData.dimensions.width, saveData.dimensions.height);
+                        
+                        // Clear current state
+                        currentGridState.clear();
+                        
+                        // Handle old format (array of [position, slug])
                         saveData.gridState.forEach(([position, colorSlug]) => {
                             const colorIndex = tilePalette.findIndex(color => color.slug === colorSlug);
                             if (colorIndex !== -1) {
@@ -868,6 +940,8 @@
                         });
                         
                         updateColorCounts();
+                        alert('Old format file loaded successfully. You can now use "Save Progress" to save it in the new format.');
+
                     } catch (error) {
                         console.error('Error loading save file:', error);
                         alert('Error loading save file. Please make sure it\'s a valid mosaic save file.');
