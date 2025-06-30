@@ -332,35 +332,55 @@
     <script>
         // Configuration
         const WHITE_THRESHOLD = 10; // LAB Delta-E threshold for considering a color as white
-        const TILE_SIZE = 20; // Size of each tile in pixels
-        
-        // Tile palette definition
+        const TILE_SIZE = 20; // Size of each tile in pixel
         const tilePalette = [
-            { slug: "off-white", name: "Off White", rgb: [232, 232, 228] },
-            { slug: "light-gray", name: "Light Gray", rgb: [201, 201, 196] },
-            { slug: "medium-gray", name: "Medium Gray", rgb: [170, 170, 164] },
-            { slug: "warm-gray", name: "Warm Gray", rgb: [140, 140, 134] },
-            { slug: "dark-gray", name: "Dark Gray", rgb: [110, 110, 104] },
-            { slug: "charcoal", name: "Charcoal", rgb: [80, 80, 74] },
-            { slug: "deep-charcoal", name: "Deep Charcoal", rgb: [60, 60, 54] },
-            { slug: "pure-white", name: "Pure White", rgb: [255, 255, 255] },
-            { slug: "black", name: "Black", rgb: [0, 0, 0] },
-            { slug: "beige", name: "Beige", rgb: [194, 180, 153] },
-            { slug: "taupe", name: "Taupe", rgb: [160, 140, 110] },
-            { slug: "brown", name: "Brown", rgb: [120, 100, 70] },
-            { slug: "dark-brown", name: "Dark Brown", rgb: [70, 50, 30] },
-            { slug: "pale-green", name: "Pale Green", rgb: [200, 220, 210] },
-            { slug: "sage", name: "Sage", rgb: [120, 180, 160] },
-            { slug: "deep-green", name: "Deep Green", rgb: [60, 120, 100] },
-            { slug: "light-blue", name: "Light Blue", rgb: [180, 210, 230] },
-            { slug: "blue", name: "Blue", rgb: [100, 150, 200] },
-            { slug: "navy", name: "Navy", rgb: [40, 80, 140] },
-            { slug: "peach", name: "Peach", rgb: [230, 200, 180] },
-            { slug: "terracotta", name: "Terracotta", rgb: [200, 140, 120] },
-            { slug: "red", name: "Red", rgb: [180, 60, 40] },
-            { slug: "yellow", name: "Yellow", rgb: [255, 220, 0] },
-            { slug: "orange", name: "Orange", rgb: [255, 150, 0] }
-        ];
+    // Row 1
+    { slug: "biscuit", name: "Biscuit", rgb: [245, 240, 230]},
+    // { slug: "pepper-white", name: "Pepper White", rgb: [245, 245, 240] },
+    { slug: "moonshine", name: "Moonshine", rgb: [225, 225, 220] },
+    { slug: "pure-white", name: "Pure White", rgb: [255, 255, 255] },
+    { slug: "urban-putty", name: "Urban Putty", rgb: [180, 175, 165] },
+    //{ slug: "elemental-tan", name: "Elemental Tan", rgb: [140, 125, 105] },
+    { slug: "desert-gray", name: "Desert Gray", rgb: [165, 165, 160] },
+    
+    // Row 2
+    { slug: "spa", name: "Spa", rgb: [175, 200, 205] },
+    { slug: "arctic-white", name: "Arctic White", rgb: [240, 240, 235] },
+    { slug: "almond", name: "Almond", rgb: [225, 215, 195] },
+    { slug: "cornsilk", name: "Cornsilk", rgb: [245, 225, 140] },
+    { slug: "luminary-gold", name: "Luminary Gold", rgb: [235, 205, 125] },
+    { slug: "architectural-gray", name: "Architectural Gray", rgb: [150, 145, 140] },
+    { slug: "uptown-taupe", name: "Uptown Taupe", rgb: [155, 140, 125] },
+    
+    // Row 3
+    { slug: "artisan-brown", name: "Artisan Brown", rgb: [75, 60, 50] },
+    { slug: "waterfall", name: "Waterfall", rgb: [185, 200, 210]},
+    { slug: "mint-ice", name: "Mint Ice", rgb: [215, 225, 215] },
+    { slug: "cypress", name: "Cypress", rgb: [95, 115, 95] },
+{ slug: "oak-moss", name: "Oak Moss", rgb: [45, 65, 50] },
+    { slug: "suede-gray", name: "Suede Gray", rgb:  [130, 125, 120]},
+    { slug: "aqua-glow", name: "Aqua Glow", rgb: [155, 180, 185] },
+    { slug: "aegean", name: "Aegean", rgb: [120, 155, 165] },
+    
+    // Row 4
+    { slug: "emerald-green", name: "Emerald Green", rgb: [60, 90, 70] },
+    { slug: "brownberry", name: "Brownberry", rgb: [65, 45, 35] },
+    { slug: "castlerock", name: "Castlerock", rgb: [90, 110, 130] },
+    { slug: "black", name: "Black", rgb: [35, 35, 35] },
+    { slug: "sunshine", name: "Sunshine", rgb: [245, 215, 80] },
+    { slug: "mustard", name: "Mustard", rgb: [195, 160, 85] },
+    { slug: "pumpkin-spice", name: "Pumpkin Spice", rgb: [185, 125, 80] },
+    { slug: "lime-sherbet", name: "Lime Sherbet", rgb: [180, 205, 140] },
+    
+    // Row 5
+    { slug: "ocean-blue", name: "Ocean Blue", rgb: [125, 165, 185] },
+    { slug: "deep-purple", name: "Deep Purple", rgb: [95, 85, 115] },
+    { slug: "nautical-blue", name: "Nautical Blue", rgb: [60, 85, 125] },
+    { slug: "galaxy", name: "Galaxy", rgb: [45, 65, 95] },
+    { slug: "navy", name: "Navy", rgb: [40, 50, 70] },
+    { slug: "clementine", name: "Clementine", rgb: [210, 120, 70] },
+    { slug: "red", name: "Red", rgb: [155, 60, 50] }
+];
         
         // State variables
         let selectedColorSlug = tilePalette[0].slug;
